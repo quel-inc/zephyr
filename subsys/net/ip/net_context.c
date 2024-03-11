@@ -1976,9 +1976,21 @@ static int recv_udp(struct net_context *context,
 
 	ARG_UNUSED(timeout);
 
+	/* If the context already has a connection handler, it means it's
+	 * already registered. In that case, all we have to do is 1) update
+	 * the callback registered in the net_context and 2) update the
+	 * user_data using net_conn_change_callback().
+	 *
+	 * Since net_conn_change_callback() takes the _other_ callback
+	 * function, net_context_packet_received() (I know it's confusing),
+	 * this must be the same function passed in net_conn_register() down below.
+	 */
 	if (context->conn_handler) {
-		net_conn_unregister(context->conn_handler);
-		context->conn_handler = NULL;
+		context->recv_cb = cb;
+		ret = net_conn_change_callback(context->conn_handler,
+					 net_context_packet_received,
+					 user_data);
+		goto end;
 	}
 
 	ret = bind_default(context);
@@ -2024,6 +2036,7 @@ static int recv_udp(struct net_context *context,
 				user_data,
 				&context->conn_handler);
 
+end:
 	return ret;
 }
 #else
